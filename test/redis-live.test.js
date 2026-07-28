@@ -16,21 +16,20 @@ import {
 
 const runFile = promisify(execFile);
 const enabled = process.env.EVENT_WATERMARK_REDIS_LIVE === "1";
-let cliAvailable = false;
 if (enabled) {
   try {
     execFileSync("redis-cli", ["--version"], { stdio: "ignore" });
-    cliAvailable = true;
-  } catch {
-    cliAvailable = false;
+  } catch (error) {
+    throw new Error(
+      "EVENT_WATERMARK_REDIS_LIVE=1 requires redis-cli to be available",
+      { cause: error },
+    );
   }
 }
 
-const skipReason = !enabled
-  ? "set EVENT_WATERMARK_REDIS_LIVE=1 to run against an explicit local Redis"
-  : !cliAvailable
-    ? "redis-cli is not available"
-    : false;
+const skipReason = enabled
+  ? false
+  : "set EVENT_WATERMARK_REDIS_LIVE=1 to run against an explicit local Redis";
 
 test("live Redis executes transition, persistence, restart, and corruption contracts", { skip: skipReason }, async (t) => {
   const host = process.env.EVENT_WATERMARK_REDIS_HOST || "127.0.0.1";

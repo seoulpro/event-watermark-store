@@ -88,7 +88,7 @@
     "lint": "node --check index.js index.cjs memory.js memory.cjs redis.js redis.cjs cache.js cache.cjs src/*.cjs test/*.js scripts/*.mjs examples/*.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test test/*.test.js",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=test/** --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 test/*.test.js",
     "test:redis": "EVENT_WATERMARK_REDIS_LIVE=1 node --test test/redis-live.test.js",
     "example": "node examples/basic.mjs",
     "package:lint": "publint",
