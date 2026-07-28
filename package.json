@@ -1,0 +1,107 @@
+{
+  "name": "event-watermark-store",
+  "version": "0.1.0",
+  "description": "Deterministic event-time watermarks with terminal precedence and atomic storage providers",
+  "keywords": [
+    "event-time",
+    "watermark",
+    "redis",
+    "idempotency",
+    "concurrency"
+  ],
+  "author": "seoulpro <lim@limsumin.com>",
+  "license": "ISC",
+  "type": "module",
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      },
+      "require": {
+        "types": "./index.d.cts",
+        "default": "./index.cjs"
+      }
+    },
+    "./memory": {
+      "import": {
+        "types": "./memory.d.ts",
+        "default": "./memory.js"
+      },
+      "require": {
+        "types": "./memory.d.cts",
+        "default": "./memory.cjs"
+      }
+    },
+    "./redis": {
+      "import": {
+        "types": "./redis.d.ts",
+        "default": "./redis.js"
+      },
+      "require": {
+        "types": "./redis.d.cts",
+        "default": "./redis.cjs"
+      }
+    },
+    "./cache": {
+      "import": {
+        "types": "./cache.d.ts",
+        "default": "./cache.js"
+      },
+      "require": {
+        "types": "./cache.d.cts",
+        "default": "./cache.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "*.cjs",
+    "*.js",
+    "*.d.ts",
+    "*.d.cts",
+    "src",
+    "docs",
+    "examples",
+    "fixtures",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seoulpro/event-watermark-store.git"
+  },
+  "homepage": "https://github.com/seoulpro/event-watermark-store#readme",
+  "bugs": {
+    "url": "https://github.com/seoulpro/event-watermark-store/issues"
+  },
+  "scripts": {
+    "lint": "node --check index.js index.cjs memory.js memory.cjs redis.js redis.cjs cache.js cache.cjs src/*.cjs test/*.js scripts/*.mjs examples/*.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 test/*.test.js",
+    "test:redis": "EVENT_WATERMARK_REDIS_LIVE=1 node --test test/redis-live.test.js",
+    "example": "node examples/basic.mjs",
+    "package:lint": "publint",
+    "package:types": "attw --pack .",
+    "package:smoke": "node scripts/verify-package.mjs",
+    "check:compat": "npm run lint && npm run typecheck && npm test && npm run example && npm run package:lint && npm run package:types && npm run package:smoke",
+    "check": "npm run lint && npm run typecheck && npm run test:coverage && npm run example && npm run package:lint && npm run package:types && npm run package:smoke",
+    "prepublishOnly": "npm run check"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "22.20.1",
+    "publint": "0.3.22",
+    "typescript": "7.0.2"
+  }
+}

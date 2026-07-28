@@ -1,0 +1,64 @@
+{
+  "configuration": {
+    "stateTtlSeconds": 300,
+    "terminalTtlSeconds": 604800,
+    "redisRequired": true
+  },
+  "transitions": [
+    {
+      "key": "device-alpha",
+      "kind": "upsert",
+      "eventTime": 2000,
+      "receivedAt": 10000,
+      "value": {
+        "status": "active"
+      },
+      "expectedStatus": "applied"
+    },
+    {
+      "key": "device-alpha",
+      "kind": "terminal",
+      "eventTime": 3000,
+      "receivedAt": 11000,
+      "reason": "tracking-ended",
+      "expectedStatus": "applied"
+    },
+    {
+      "key": "device-alpha",
+      "kind": "upsert",
+      "eventTime": 2750,
+      "receivedAt": 12000,
+      "value": {
+        "status": "late-retry"
+      },
+      "expectedStatus": "blocked-by-terminal"
+    },
+    {
+      "key": "device-alpha",
+      "kind": "terminal",
+      "eventTime": 3000,
+      "receivedAt": 12001,
+      "reason": "duplicate-end",
+      "expectedStatus": "blocked-by-terminal"
+    },
+    {
+      "key": "device-alpha",
+      "kind": "upsert",
+      "eventTime": 3001,
+      "receivedAt": 12002,
+      "value": {
+        "status": "resumed"
+      },
+      "expectedStatus": "applied"
+    }
+  ],
+  "expectedRecord": {
+    "key": "device-alpha",
+    "kind": "upsert",
+    "eventTime": 3001,
+    "receivedAt": 12002,
+    "value": {
+      "status": "resumed"
+    }
+  }
+}
