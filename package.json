@@ -9,7 +9,7 @@
     "idempotency",
     "concurrency"
   ],
-  "author": "seoulpro <lim@limsumin.com>",
+  "author": "Sumin Lim <lim@limsumin.com> (https://limsumin.com)",
   "license": "ISC",
   "type": "module",
   "main": "./index.cjs",
