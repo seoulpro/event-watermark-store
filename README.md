@@ -227,6 +227,13 @@ npm run test:redis
 
 This opt-in test uses a random prefix and deletes only its exact test key.
 
+## Related projects
+
+- [trajectory-rollup](https://github.com/seoulpro/trajectory-rollup) — deterministic
+  aggregation over event streams of this kind.
+- [atomic-quadtree-cut](https://github.com/seoulpro/atomic-quadtree-cut) — atomic
+  replacement rules for streamed state, in a spatial setting.
+
 ## License
 
 [ISC](LICENSE)
