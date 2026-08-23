@@ -2,7 +2,54 @@
 
 const { createHash } = require("node:crypto");
 
+const MAX_VALUE_DEPTH = 128;
+const MAX_VALUE_NODES = 100_000;
+const MAX_VALUE_BYTES = 16 * 1024 * 1024;
+
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+const createValueBudget = () => ({ nodes: 0, bytes: 0 });
+
+const assertNodeCapacity = (budget, count, label) => {
+  if (count > MAX_VALUE_NODES - budget.nodes) {
+    throw new RangeError(`${label} exceeds the ${MAX_VALUE_NODES}-node value budget`);
+  }
+};
+
+const consumeBytes = (budget, byteLength, label) => {
+  budget.bytes += byteLength;
+  if (budget.bytes > MAX_VALUE_BYTES) {
+    throw new RangeError(`${label} exceeds the ${MAX_VALUE_BYTES}-byte value budget`);
+  }
+};
+
+const consumeText = (budget, value, label) => {
+  consumeBytes(budget, Buffer.byteLength(value, "utf8"), label);
+};
+
+const consumeValue = (value, budget, depth, label) => {
+  if (depth > MAX_VALUE_DEPTH) {
+    throw new RangeError(`${label} exceeds the maximum nesting depth of ${MAX_VALUE_DEPTH}`);
+  }
+  budget.nodes += 1;
+  if (budget.nodes > MAX_VALUE_NODES) {
+    throw new RangeError(`${label} exceeds the ${MAX_VALUE_NODES}-node value budget`);
+  }
+  if (typeof value === "string") {
+    consumeText(budget, value, label);
+  } else if (value instanceof ArrayBuffer) {
+    consumeBytes(budget, value.byteLength, label);
+  } else if (ArrayBuffer.isView(value)) {
+    consumeBytes(budget, value.byteLength, label);
+  }
+};
+
+const consumeArrayHole = (budget, label) => {
+  budget.nodes += 1;
+  if (budget.nodes > MAX_VALUE_NODES) {
+    throw new RangeError(`${label} exceeds the ${MAX_VALUE_NODES}-node value budget`);
+  }
+};
 
 const compareRepresentations = (left, right) => {
   const leftText = JSON.stringify(left);
@@ -18,7 +65,13 @@ const numberToken = (value) => {
   return String(value);
 };
 
-const canonicalValueRepresentation = (value, ancestors = new Set()) => {
+const canonicalValueRepresentation = (
+  value,
+  ancestors = new Set(),
+  budget = createValueBudget(),
+  depth = 0,
+) => {
+  consumeValue(value, budget, depth, "operationId value");
   if (value === null) return ["null"];
 
   switch (typeof value) {
@@ -46,13 +99,22 @@ const canonicalValueRepresentation = (value, ancestors = new Set()) => {
 
   try {
     if (Array.isArray(value)) {
+      assertNodeCapacity(budget, value.length, "operationId value");
       const items = [];
       for (let index = 0; index < value.length; index += 1) {
-        items.push(
-          hasOwn(value, index)
-            ? canonicalValueRepresentation(value[index], ancestors)
-            : ["array-hole"],
-        );
+        if (hasOwn(value, index)) {
+          items.push(
+            canonicalValueRepresentation(
+              value[index],
+              ancestors,
+              budget,
+              depth + 1,
+            ),
+          );
+        } else {
+          consumeArrayHole(budget, "operationId value");
+          items.push(["array-hole"]);
+        }
       }
       return ["array", items];
     }
@@ -67,17 +129,19 @@ const canonicalValueRepresentation = (value, ancestors = new Set()) => {
     }
 
     if (value instanceof Map) {
+      assertNodeCapacity(budget, value.size * 2, "operationId value");
       const entries = [...value].map(([key, entryValue]) => [
-        canonicalValueRepresentation(key, ancestors),
-        canonicalValueRepresentation(entryValue, ancestors),
+        canonicalValueRepresentation(key, ancestors, budget, depth + 1),
+        canonicalValueRepresentation(entryValue, ancestors, budget, depth + 1),
       ]);
       entries.sort(compareRepresentations);
       return ["map", entries];
     }
 
     if (value instanceof Set) {
+      assertNodeCapacity(budget, value.size, "operationId value");
       const entries = [...value].map((entry) =>
-        canonicalValueRepresentation(entry, ancestors),
+        canonicalValueRepresentation(entry, ancestors, budget, depth + 1),
       );
       entries.sort(compareRepresentations);
       return ["set", entries];
@@ -107,11 +171,24 @@ const canonicalValueRepresentation = (value, ancestors = new Set()) => {
       throw new TypeError("operationId values cannot contain enumerable symbol keys");
     }
 
+    const keys = Object.keys(value);
+    assertNodeCapacity(budget, keys.length, "operationId value");
     return [
       "object",
-      Object.keys(value)
+      keys
         .sort()
-        .map((key) => [key, canonicalValueRepresentation(value[key], ancestors)]),
+        .map((key) => {
+          consumeText(budget, key, "operationId value");
+          return [
+            key,
+            canonicalValueRepresentation(
+              value[key],
+              ancestors,
+              budget,
+              depth + 1,
+            ),
+          ];
+        }),
     ];
   } finally {
     ancestors.delete(value);
@@ -121,7 +198,13 @@ const canonicalValueRepresentation = (value, ancestors = new Set()) => {
 const canonicalEncodeValue = (value) =>
   JSON.stringify(canonicalValueRepresentation(value));
 
-const cloneCanonicalValue = (value, ancestors = new Set()) => {
+const cloneCanonicalValue = (
+  value,
+  ancestors = new Set(),
+  budget = createValueBudget(),
+  depth = 0,
+) => {
+  consumeValue(value, budget, depth, "operationId value");
   if (value === null || (typeof value !== "object" && typeof value !== "function")) {
     if (typeof value === "symbol" || typeof value === "function") {
       throw new TypeError("operationId values cannot contain symbols or functions");
@@ -138,10 +221,18 @@ const cloneCanonicalValue = (value, ancestors = new Set()) => {
 
   try {
     if (Array.isArray(value)) {
+      assertNodeCapacity(budget, value.length, "operationId value");
       const clone = new Array(value.length);
       for (let index = 0; index < value.length; index += 1) {
         if (hasOwn(value, index)) {
-          clone[index] = cloneCanonicalValue(value[index], ancestors);
+          clone[index] = cloneCanonicalValue(
+            value[index],
+            ancestors,
+            budget,
+            depth + 1,
+          );
+        } else {
+          consumeArrayHole(budget, "operationId value");
         }
       }
       return clone;
@@ -149,16 +240,20 @@ const cloneCanonicalValue = (value, ancestors = new Set()) => {
     if (value instanceof Date) return new Date(value.getTime());
     if (value instanceof RegExp) return new RegExp(value.source, value.flags);
     if (value instanceof Map) {
+      assertNodeCapacity(budget, value.size * 2, "operationId value");
       return new Map(
         [...value].map(([key, entryValue]) => [
-          cloneCanonicalValue(key, ancestors),
-          cloneCanonicalValue(entryValue, ancestors),
+          cloneCanonicalValue(key, ancestors, budget, depth + 1),
+          cloneCanonicalValue(entryValue, ancestors, budget, depth + 1),
         ]),
       );
     }
     if (value instanceof Set) {
+      assertNodeCapacity(budget, value.size, "operationId value");
       return new Set(
-        [...value].map((entry) => cloneCanonicalValue(entry, ancestors)),
+        [...value].map((entry) =>
+          cloneCanonicalValue(entry, ancestors, budget, depth + 1),
+        ),
       );
     }
     if (value instanceof ArrayBuffer) return value.slice(0);
@@ -182,11 +277,14 @@ const cloneCanonicalValue = (value, ancestors = new Set()) => {
       throw new TypeError("operationId values cannot contain enumerable symbol keys");
     }
     const clone = Object.create(prototype);
-    for (const key of Object.keys(value)) {
+    const keys = Object.keys(value);
+    assertNodeCapacity(budget, keys.length, "operationId value");
+    for (const key of keys) {
+      consumeText(budget, key, "operationId value");
       Object.defineProperty(clone, key, {
         configurable: true,
         enumerable: true,
-        value: cloneCanonicalValue(value[key], ancestors),
+        value: cloneCanonicalValue(value[key], ancestors, budget, depth + 1),
         writable: true,
       });
     }
@@ -203,7 +301,10 @@ const normalizeStableJsonValue = (
   key,
   ancestors = new Set(),
   applyToJson = true,
+  budget = createValueBudget(),
+  depth = 0,
 ) => {
+  consumeValue(input, budget, depth, "value");
   let value = input;
   if (
     applyToJson &&
@@ -212,7 +313,14 @@ const normalizeStableJsonValue = (
     typeof value.toJSON === "function"
   ) {
     value = value.toJSON(key);
-    return normalizeStableJsonValue(value, key, ancestors, false);
+    return normalizeStableJsonValue(
+      value,
+      key,
+      ancestors,
+      false,
+      budget,
+      depth,
+    );
   }
 
   if (
@@ -228,8 +336,16 @@ const normalizeStableJsonValue = (
 
   try {
     if (Array.isArray(value)) {
+      assertNodeCapacity(budget, value.length, "value");
       return Array.from({ length: value.length }, (_, index) => {
-        const item = normalizeStableJsonValue(value[index], String(index), ancestors);
+        const item = normalizeStableJsonValue(
+          value[index],
+          String(index),
+          ancestors,
+          true,
+          budget,
+          depth + 1,
+        );
         return item === OMIT_JSON_VALUE ? null : item;
       });
     }
@@ -246,11 +362,17 @@ const normalizeStableJsonValue = (
     }
 
     const output = Object.create(null);
-    for (const property of Object.keys(value).sort()) {
+    const properties = Object.keys(value);
+    assertNodeCapacity(budget, properties.length, "value");
+    for (const property of properties.sort()) {
+      consumeText(budget, property, "value");
       const normalized = normalizeStableJsonValue(
         value[property],
         property,
         ancestors,
+        true,
+        budget,
+        depth + 1,
       );
       if (normalized !== OMIT_JSON_VALUE) output[property] = normalized;
     }

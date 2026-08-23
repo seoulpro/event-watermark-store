@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Bound built-in value canonicalization by nesting depth, traversed nodes, and
+  aggregate string/binary bytes, returning predictable range errors before
+  recursive stack exhaustion.
+
 ## 0.1.0
 
 - Define terminal-preferred event-time ordering.

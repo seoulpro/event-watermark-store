@@ -79,6 +79,31 @@ test("operation fingerprint rejects values without stable identity", () => {
   );
 });
 
+test("value budgets reject excessive depth, breadth, and bytes predictably", () => {
+  let deeplyNested = "leaf";
+  for (let depth = 0; depth < 130; depth += 1) {
+    deeplyNested = { child: deeplyNested };
+  }
+  for (const operation of [canonicalEncodeValue, cloneCanonicalValue]) {
+    assert.throws(
+      () => operation(deeplyNested),
+      /maximum nesting depth of 128/,
+    );
+    assert.throws(
+      () => operation(new Array(100_001)),
+      /100000-node value budget/,
+    );
+    assert.throws(
+      () => operation("x".repeat(16 * 1024 * 1024 + 1)),
+      /16777216-byte value budget/,
+    );
+  }
+  assert.throws(
+    () => stableJsonEncode(deeplyNested),
+    /maximum nesting depth of 128/,
+  );
+});
+
 test("canonical snapshots detach every supported mutable container", () => {
   const source = {
     array: [{ value: 1 }],
