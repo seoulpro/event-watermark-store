@@ -104,6 +104,13 @@ dates, regular expressions, maps, sets, array buffers, and typed binary views.
 They are snapshotted when stored and cloned on each read, so caller mutation
 cannot change recorded operation content.
 
+The built-in canonical encoders reject values deeper than 128 levels, larger
+than 100,000 traversed nodes, or containing more than 16 MiB of aggregate
+string and binary data. These deterministic budgets prevent a malformed value
+from turning replay fingerprinting into unbounded CPU, allocation, or call
+stack use. Custom Redis encoders remain responsible for their own input and
+output budgets.
+
 The Redis provider fingerprints the configured codec output. Its default JSON
 codec sorts object keys recursively, so equivalent JSON content does not depend
 on property insertion order. Custom encoders use exact string identity and must
