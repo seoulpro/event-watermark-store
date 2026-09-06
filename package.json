@@ -1,6 +1,6 @@
 {
   "name": "event-watermark-store",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deterministic event-time watermarks with terminal precedence and atomic storage providers",
   "keywords": [
     "event-time",
