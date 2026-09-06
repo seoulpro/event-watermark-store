@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-06
+
 - Bound built-in value canonicalization by nesting depth, traversed nodes, and
   aggregate string/binary bytes, returning predictable range errors before
   recursive stack exhaustion.
